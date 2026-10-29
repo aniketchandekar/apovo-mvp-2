@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/demo/workflows/*/events/route.ts": {
+      "supportsCancellation": true
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": ".",
+    "outDir": ".test-dist",
+    "noEmit": false,
+    "incremental": false,
+    "allowJs": false,
+    "isolatedModules": false,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/lib/application-agent/errors.ts",
+    "src/lib/application-agent/input-validation.ts",
+    "src/lib/application-agent/run-repository.ts",
+    "src/lib/application-agent/state-machine.ts",
+    "src/lib/application-agent/types.ts",
+    "src/lib/application-agent/worker.ts",
+    "src/lib/application-agent/phases/index.ts",
+    "src/lib/application-agent/phases/browser-discovery.ts",
+    "src/lib/application-agent/phases/pdf-handlers.ts",
+    "src/lib/application-agent/phases/test-mode-handlers.ts",
+    "src/lib/artifacts/**/*.ts",
+    "src/lib/integrations/agentmail/api.ts",
+    "src/lib/integrations/agentmail/application-test-delivery.ts",
+    "src/lib/integrations/browserbase/config.ts",
+    "src/lib/integrations/browserbase/downloads.ts",
+    "src/lib/integrations/browserbase/url-policy.ts",
+    "src/lib/pdf/**/*.ts",
+    "src/lib/resource-catalog.ts",
+    "src/components/talk/FormattedMessage.tsx",
+    "tests/**/*.ts"
+  ],
+  "exclude": ["node_modules", ".next", ".test-dist"]
+}
