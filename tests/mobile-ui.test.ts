@@ -52,12 +52,22 @@ test('mobile form controls retain a 16px text size', () => {
 
 test('durable demo packet preview uses browser tabs and a mobile activity drawer', () => {
   const preview = source('src/components/demo/DemoPacketPreview.tsx');
+  const canvasViewer = source('src/components/demo/PdfCanvasViewer.tsx');
   const workspace = source('src/components/demo/DemoWorkflowWorkspace.tsx');
   const viewer = source('src/components/demo/DemoWorkspaceViewer.tsx');
-  assert.doesNotMatch(preview, /createObjectURL|packet\.base64/);
+  assert.doesNotMatch(preview, /createObjectURL|packet\.base64|<iframe/);
   assert.match(preview, /api\/demo\/workflows/);
-  assert.match(preview, /method: 'HEAD'/);
-  assert.match(preview, /Retry preview/);
+  assert.match(preview, /dynamic\(/);
+  assert.match(preview, /ssr: false/);
+  assert.match(canvasViewer, /import\('pdfjs-dist'\)/);
+  assert.match(canvasViewer, /pdf\.worker\.min\.mjs/);
+  assert.match(canvasViewer, /credentials: 'same-origin'/);
+  assert.match(canvasViewer, /MAX_OUTPUT_SCALE = 2/);
+  assert.match(canvasViewer, /ResizeObserver/);
+  assert.match(canvasViewer, /renderedCount \+ 1/);
+  assert.match(canvasViewer, /Retry preview/);
+  assert.match(canvasViewer, /loadingTask\?\.destroy/);
+  assert.match(canvasViewer, /renderTask\?\.cancel/);
   assert.match(viewer, /role="tablist"/);
   assert.match(viewer, /packet \? 'pdf' : 'browser'/);
   assert.match(workspace, /key=\{workflow\.packet\?\.artifactId \|\| 'browser'\}/);
