@@ -75,3 +75,22 @@ export async function POST(request: NextRequest) {
     return configurationError();
   }
 }
+
+export async function DELETE() {
+  if (!isVercelDemoMode()) return unavailable();
+  try {
+    const configuration = getDemoSessionConfiguration();
+    const session = createDemoSession();
+    const response = NextResponse.json(
+      { session: publicDemoSessionSummary(session) },
+      { status: 201 }
+    );
+    return setDemoSessionCookie(
+      response,
+      signDemoSession(session, configuration.signingSecret)
+    );
+  } catch (error) {
+    if (error instanceof DemoSessionConfigurationError) return configurationError();
+    return configurationError();
+  }
+}

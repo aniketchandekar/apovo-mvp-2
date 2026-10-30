@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   FolderHeart,
@@ -15,6 +15,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  RotateCcw,
   Trash2,
   X,
   FlaskConical,
@@ -43,12 +44,14 @@ export function AppShell({
   onRefreshData,
 }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const testMode = useTestMode();
   const demo = useDemoSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [clearingData, setClearingData] = useState(false);
+  const [resettingDemo, setResettingDemo] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -78,6 +81,25 @@ export function AppShell({
       alert('Network issue while clearing data.');
     } finally {
       setClearingData(false);
+    }
+  };
+
+  const handleResetDemo = async () => {
+    const confirmed = window.confirm(
+      'Start a fresh demo? This resets the synthetic profile, tasks, inbox, and workflow progress. No email will be sent.'
+    );
+    if (!confirmed) return;
+
+    setResettingDemo(true);
+    try {
+      await demo.reset();
+      router.replace('/dashboard');
+      router.refresh();
+    } catch (error) {
+      console.error('Error starting a fresh demo:', error);
+      alert('Could not start a fresh demo. Please try again.');
+    } finally {
+      setResettingDemo(false);
     }
   };
 
@@ -378,7 +400,18 @@ export function AppShell({
                 <strong>{patientDisplayName}</strong>
                 <span><i />Active care profile</span>
               </div>
-              {!demo.available ? (
+              {demo.available ? (
+                <button
+                  type="button"
+                  className="sidebar-clear-btn"
+                  onClick={handleResetDemo}
+                  disabled={resettingDemo}
+                  title="Reset synthetic demo data and start a new session"
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                  <span>{resettingDemo ? 'Starting fresh…' : 'Start fresh demo'}</span>
+                </button>
+              ) : !demo.loading ? (
                 <button
                   type="button"
                   className="sidebar-clear-btn"
@@ -386,7 +419,7 @@ export function AppShell({
                   disabled={clearingData}
                   title="Clear all stored application and profile data"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={14} aria-hidden="true" />
                   <span>{clearingData ? 'Clearing…' : 'Clear data'}</span>
                 </button>
               ) : null}
@@ -396,7 +429,18 @@ export function AppShell({
               <div className="sidebar-profile-collapsed" title={patientDisplayName}>
                 <span className="profile-status-dot" />
               </div>
-              {!demo.available ? (
+              {demo.available ? (
+                <button
+                  type="button"
+                  className="sidebar-clear-btn-collapsed"
+                  onClick={handleResetDemo}
+                  disabled={resettingDemo}
+                  title="Start a fresh demo"
+                  aria-label="Start a fresh demo"
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                </button>
+              ) : !demo.loading ? (
                 <button
                   type="button"
                   className="sidebar-clear-btn-collapsed"
@@ -405,7 +449,7 @@ export function AppShell({
                   title="Clear all stored application and profile data"
                   aria-label="Clear all data"
                 >
-                  <Trash2 size={15} />
+                  <Trash2 size={15} aria-hidden="true" />
                 </button>
               ) : null}
             </div>
@@ -849,6 +893,7 @@ export function AppShell({
           justify-content: center;
           gap: 7px;
           width: 100%;
+          min-height: 44px;
           padding: 7px 12px;
           border: 1px solid var(--line);
           border-radius: var(--radius-button);
@@ -857,7 +902,7 @@ export function AppShell({
           font-size: 0.78rem;
           font-weight: 500;
           cursor: pointer;
-          transition: all var(--duration-fast) ease;
+          transition: color var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
         }
         .sidebar-clear-btn:hover:not(:disabled) {
           color: #dc2626;
@@ -885,7 +930,7 @@ export function AppShell({
           background: var(--paper);
           color: var(--ink-muted);
           cursor: pointer;
-          transition: all var(--duration-fast) ease;
+          transition: color var(--duration-fast) ease, border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
         }
         .sidebar-clear-btn-collapsed:hover:not(:disabled) {
           color: #dc2626;
@@ -908,6 +953,8 @@ export function AppShell({
             position: fixed !important;
             inset: 0 auto 0 0 !important;
             width: min(88vw, 320px) !important;
+            overflow-y: auto;
+            overscroll-behavior: contain;
           }
           .sidebar-mobile-open .sidebar-close-btn { display: block !important; }
           .sidebar-collapse-btn-top { display: none !important; }

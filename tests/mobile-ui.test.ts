@@ -25,6 +25,9 @@ test('shared shell exposes five safe-area-aware mobile destinations', () => {
   assert.match(shell, /env\(safe-area-inset-bottom\)/);
   assert.match(shell, /aria-current=\{item\.active \? 'page'/);
   assert.match(shell, /role=\{sidebarOpen \? 'dialog'/);
+  assert.match(shell, /Start fresh demo/);
+  assert.match(shell, /demo\.reset\(\)/);
+  assert.match(shell, /overflow-y: auto/);
 });
 
 test('Browserbase mobile view is read-only, responsive, and full-screen capable', () => {

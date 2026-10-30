@@ -16,6 +16,7 @@ interface DemoSessionContextValue {
   session: PublicDemoSessionSummary | null;
   syncSession: (session: PublicDemoSessionSummary) => void;
   refresh: () => Promise<void>;
+  reset: () => Promise<void>;
 }
 
 const DemoSessionContext = createContext<DemoSessionContextValue>({
@@ -24,6 +25,7 @@ const DemoSessionContext = createContext<DemoSessionContextValue>({
   session: null,
   syncSession: () => undefined,
   refresh: async () => undefined,
+  reset: async () => undefined,
 });
 
 function validSummary(value: unknown): value is PublicDemoSessionSummary {
@@ -76,6 +78,19 @@ export function DemoSessionProvider({ children }: { children: React.ReactNode })
     }
   }, [syncSession]);
 
+  const reset = useCallback(async () => {
+    const response = await fetch('/api/demo/session', {
+      method: 'DELETE',
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    const payload = (await response.json()) as { session?: unknown; error?: string };
+    if (!response.ok || !validSummary(payload.session)) {
+      throw new Error(payload.error || 'Could not start a fresh demo session.');
+    }
+    syncSession(payload.session);
+  }, [syncSession]);
+
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/demo/session', {
@@ -126,8 +141,9 @@ export function DemoSessionProvider({ children }: { children: React.ReactNode })
       session,
       syncSession,
       refresh: () => load('GET'),
+      reset,
     }),
-    [available, load, loading, session, syncSession]
+    [available, load, loading, reset, session, syncSession]
   );
 
   return <DemoSessionContext.Provider value={value}>{children}</DemoSessionContext.Provider>;
