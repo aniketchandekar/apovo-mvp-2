@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { ApplicationRunError } from '../../application-agent/errors';
 
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 45_000;
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_MAX_PDF_BYTES = 15 * 1024 * 1024;
 

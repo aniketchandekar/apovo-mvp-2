@@ -77,6 +77,25 @@ export async function startBrowserbaseSession(
             return context.newPage();
           },
         },
+        async download(url) {
+          const page = context.pages()[0] || (await context.newPage());
+          const cdp = await context.newCDPSession(page);
+          try {
+            await cdp.send('Browser.setDownloadBehavior', {
+              behavior: 'allow',
+              downloadPath: 'downloads',
+              eventsEnabled: true,
+            });
+            const downloadStarted = page
+              .waitForEvent('download', { timeout: 15_000 })
+              .catch(() => undefined);
+            await page.goto(url).catch(() => undefined);
+            const download = await downloadStarted;
+            await download?.path().catch(() => undefined);
+          } finally {
+            await cdp.detach().catch(() => undefined);
+          }
+        },
         async close() {
           await playwrightBrowser?.close();
         },

@@ -14,21 +14,7 @@ async function navigateToDownload(
   applicationUrl: string,
   session: BrowserAutomationSession
 ) {
-  const { chromium } = await import('playwright-core');
-  const browser = await chromium.connectOverCDP(session.connectUrl);
-  try {
-    const context = browser.contexts()[0];
-    const page = context.pages()[0] || (await context.newPage());
-    const cdp = await context.newCDPSession(page);
-    await cdp.send('Browser.setDownloadBehavior', {
-      behavior: 'allow',
-      downloadPath: 'downloads',
-      eventsEnabled: true,
-    });
-    await page.goto(applicationUrl).catch(() => undefined);
-  } finally {
-    await browser.close();
-  }
+  await session.browser.download(applicationUrl);
 }
 
 export async function downloadApplicationPdfBytes(

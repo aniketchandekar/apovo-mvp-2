@@ -13,6 +13,7 @@ export interface BrowserAutomationContext {
 
 export interface BrowserAutomationController {
   context: BrowserAutomationContext;
+  download(url: string): Promise<void>;
   close(): Promise<void>;
 }
 

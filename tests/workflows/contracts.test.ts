@@ -38,10 +38,15 @@ test('workflow events use an allowlisted public contract', () => {
 
 test('browser workflow uses native Browserbase and reconnects durable streams', () => {
   const client = source('src/lib/integrations/browserbase/client.ts');
+  const download = source('src/lib/integrations/browserbase/download-bytes.ts');
   const inspector = source('src/lib/application-agent/phases/inspect-site.ts');
   const stream = source('src/components/demo/useDemoWorkflow.ts');
   assert.match(client, /sdk\.sessions\.create/);
   assert.match(client, /chromium\.connectOverCDP/);
+  assert.match(client, /Browser\.setDownloadBehavior/);
+  assert.match(client, /waitForEvent\('download'/);
+  assert.match(download, /session\.browser\.download\(applicationUrl\)/);
+  assert.doesNotMatch(download, /connectOverCDP|browser\.close/);
   assert.doesNotMatch(client, /stagehand|browserbase\.launch/);
   assert.doesNotMatch(inspector, /stagehand|\.extract\(/);
   assert.match(stream, /startIndex=\$\{nextStartIndex\}/);
