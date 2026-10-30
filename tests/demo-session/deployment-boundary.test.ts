@@ -14,6 +14,13 @@ test('denies legacy mutations and permits only approved demo/read APIs in demo m
     ['/api/dashboard', 'GET'],
     ['/api/capabilities', 'GET'],
     ['/api/chat', 'GET'],
+    ['/api/tasks', 'GET'],
+    ['/api/inbox', 'GET'],
+    ['/api/inbox', 'POST'],
+    ['/api/tasks/demo_task_remember_betty_followup/answer', 'POST'],
+    ['/api/tasks/demo_task_remember_betty_followup/skip', 'POST'],
+    ['/api/inbox/demo_thread_remember_betty', 'GET'],
+    ['/api/inbox/demo_thread_remember_betty', 'POST'],
   ]) {
     const response = proxy(new NextRequest(`https://demo.example${target[0]}`, { method: target[1] }));
     assert.notEqual(response.status, 404, `${target[1]} ${target[0]} should pass the boundary`);
@@ -27,6 +34,10 @@ test('denies legacy mutations and permits only approved demo/read APIs in demo m
     ['/api/test-care-email', 'POST'],
     ['/api/webhooks/agentmail', 'POST'],
     ['/api/applications/app_test/runs', 'POST'],
+    ['/api/tasks/demo_task_unknown/answer', 'POST'],
+    ['/api/tasks/demo_task_remember_betty_followup/answer', 'GET'],
+    ['/api/inbox/demo_thread_unknown', 'GET'],
+    ['/api/inbox/demo_thread_remember_betty/reclassify', 'POST'],
   ]) {
     const response = proxy(new NextRequest(`https://demo.example${target[0]}`, { method: target[1] }));
     assert.equal(response.status, 404, `${target[1]} ${target[0]} should be hidden`);

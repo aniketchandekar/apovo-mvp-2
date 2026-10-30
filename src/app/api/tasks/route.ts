@@ -1,8 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ApovoStore } from '@/lib/store';
+import { isVercelDemoMode } from '@/lib/demo-session/config';
+import { demoTaskPayload, EMPTY_DEMO_UI_STATE } from '@/lib/demo-session/fixtures';
+import { readDemoSessionOrNull } from '@/lib/demo-session/state';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    if (isVercelDemoMode()) {
+      return NextResponse.json(
+        demoTaskPayload(readDemoSessionOrNull(req)?.ui || EMPTY_DEMO_UI_STATE)
+      );
+    }
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
     const category = searchParams.get('category');

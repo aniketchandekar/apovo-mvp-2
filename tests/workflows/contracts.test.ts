@@ -33,3 +33,15 @@ test('workflow events use an allowlisted public contract', () => {
   assert.match(types, /liveViewUrl\?: string/);
   assert.doesNotMatch(types, /connectUrl|apiKey|sessionId/);
 });
+
+test('browser workflow uses native Browserbase and reconnects durable streams', () => {
+  const client = source('src/lib/integrations/browserbase/client.ts');
+  const inspector = source('src/lib/application-agent/phases/inspect-site.ts');
+  const stream = source('src/components/demo/useDemoWorkflow.ts');
+  assert.match(client, /sdk\.sessions\.create/);
+  assert.match(client, /chromium\.connectOverCDP/);
+  assert.doesNotMatch(client, /stagehand|browserbase\.launch/);
+  assert.doesNotMatch(inspector, /stagehand|\.extract\(/);
+  assert.match(stream, /startIndex=\$\{nextStartIndex\}/);
+  assert.doesNotMatch(stream, /reconnects > 3[\s\S]*return;/);
+});

@@ -9,7 +9,6 @@ function fakeSession(close: () => void): BrowserAutomationSession {
     connectUrl: 'wss://connect.example.test',
     liveViewUrl: 'https://debug.example.test/session',
     browser: {} as BrowserAutomationSession['browser'],
-    stagehand: {} as BrowserAutomationSession['stagehand'],
     close: async () => close(),
   };
 }

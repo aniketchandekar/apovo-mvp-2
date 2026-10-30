@@ -25,6 +25,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { AppShell } from '@/components/dashboard/AppShell';
+import { useDemoSession } from '@/components/demo/DemoSessionProvider';
 import type {
   AgentDraftRecord,
   ApplicationRecord,
@@ -136,6 +137,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 export function CareInboxView() {
+  const demoSession = useDemoSession();
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialThreadParam = searchParams.get('thread') || '';
@@ -493,10 +495,10 @@ export function CareInboxView() {
     setComposeBusy(true);
     setBannerMessage(null);
     try {
-      const endpoint = app
+      const endpoint = app && !demoSession.available
         ? `/api/applications/${encodeURIComponent(app.id)}/followup`
         : '/api/inbox';
-      const payload = app
+      const payload = app && !demoSession.available
         ? {
             mode,
             to: composeTo.trim(),
@@ -642,10 +644,20 @@ export function CareInboxView() {
               className="toolbar-btn"
               disabled={syncing || !inboxId}
               onClick={() => void loadInbox({ forceSync: true })}
-              title="Sync threads and drafts from AgentMail v0 API"
+              title={
+                demoSession.available
+                  ? 'Refresh synthetic demo messages'
+                  : 'Sync threads and drafts from AgentMail v0 API'
+              }
             >
               <RefreshCw size={15} className={syncing ? 'spin' : ''} />
-              <span>{syncing ? 'Syncing…' : 'Sync AgentMail'}</span>
+              <span>
+                {syncing
+                  ? 'Refreshing…'
+                  : demoSession.available
+                    ? 'Refresh demo'
+                    : 'Sync AgentMail'}
+              </span>
             </button>
 
             <button
@@ -872,7 +884,7 @@ export function CareInboxView() {
                     <h2 className="thread-subject">{selectedDetail.subject}</h2>
                   </div>
 
-                  {selectedDetail.latest && (
+                  {selectedDetail.latest && !demoSession.available && (
                     <div className="reclassify-control">
                       <label htmlFor="reclassify-select">Agent Label:</label>
                       <select

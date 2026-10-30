@@ -1,4 +1,4 @@
-import { after, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { ApovoStore } from '@/lib/store';
 import { ApplicationRunError } from '@/lib/application-agent/errors';
 import { publicInput, validateInputAnswer } from '@/lib/application-agent/input-validation';
@@ -11,6 +11,19 @@ import {
   sendCareDraft,
   updateCareDraft,
 } from '@/lib/integrations/agentmail/client';
+import { isVercelDemoMode } from '@/lib/demo-session/config';
+import {
+  DEMO_ACK_THREAD_ID,
+  DEMO_TASK_ID,
+  demoTasks,
+} from '@/lib/demo-session/fixtures';
+import {
+  appendUnique,
+  demoStateResponse,
+  requireDemoSession,
+  updateDemoUiState,
+  without,
+} from '@/lib/demo-session/state';
 
 function extractEmailAddress(raw: string): string {
   const match = raw.match(/<([^>]+)>/);
@@ -18,12 +31,42 @@ function extractEmailAddress(raw: string): string {
 }
 
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
+    if (isVercelDemoMode()) {
+      const auth = requireDemoSession(req);
+      if (auth.error) return auth.error;
+      if (id !== DEMO_TASK_ID) {
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      }
+      const next = updateDemoUiState(auth.session, (ui) => ({
+        ...ui,
+        answeredTaskIds: appendUnique(ui.answeredTaskIds, id),
+        skippedTaskIds: without(ui.skippedTaskIds, id),
+        draft: body.sendWithConsent ? undefined : ui.draft,
+        sentThreadIds: body.sendWithConsent
+          ? appendUnique(ui.sentThreadIds, DEMO_ACK_THREAD_ID)
+          : ui.sentThreadIds,
+      }));
+      return demoStateResponse(
+        {
+          success: true,
+          task: demoTasks(next.ui)[0],
+          sent: body.sendWithConsent
+            ? { messageId: 'demo_message_task_consent', threadId: 'demo_thread_remember_betty' }
+            : null,
+          profileUpdated: false,
+          message: body.sendWithConsent
+            ? 'Synthetic consent confirmed. No external email was sent.'
+            : 'Answer saved in this demo session.',
+        },
+        next
+      );
+    }
     const patient = ApovoStore.getActivePatient();
 
     // 1. Check if this pending item is a RequiredInput from an active PDF ApplicationRun

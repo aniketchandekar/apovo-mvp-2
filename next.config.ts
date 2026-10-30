@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  serverExternalPackages: ['@browserbasehq/stagehand', '@google/adk', '@google/genai'],
+  serverExternalPackages: ['@google/adk', '@google/genai'],
   images: {
     remotePatterns: [
       {

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ApovoStore } from '@/lib/store';
 import {
   AgentMailError,
@@ -9,6 +9,21 @@ import {
   updateCareDraft,
   updateCareMessageLabels,
 } from '@/lib/integrations/agentmail/client';
+import { isVercelDemoMode } from '@/lib/demo-session/config';
+import {
+  EMPTY_DEMO_UI_STATE,
+  demoDraft,
+  demoThreadDetail,
+  isDemoThreadId,
+} from '@/lib/demo-session/fixtures';
+import {
+  appendUnique,
+  demoStateResponse,
+  readDemoSessionOrNull,
+  requireDemoSession,
+  updateDemoUiState,
+  without,
+} from '@/lib/demo-session/state';
 
 function hasAgentMailApiKey(): boolean {
   return Boolean(process.env.AGENTMAIL_API_KEY?.trim());
@@ -20,11 +35,26 @@ function extractEmailAddress(raw: string): string {
 }
 
 export async function GET(
-  _req: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
     const { threadId } = await params;
+    if (isVercelDemoMode()) {
+      if (!isDemoThreadId(threadId)) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+      }
+      const session = readDemoSessionOrNull(request);
+      if (!session) {
+        return NextResponse.json(demoThreadDetail(EMPTY_DEMO_UI_STATE, threadId));
+      }
+      const next = updateDemoUiState(session, (ui) => ({
+        ...ui,
+        readThreadIds: appendUnique(ui.readThreadIds, threadId),
+        unreadThreadIds: without(ui.unreadThreadIds, threadId),
+      }));
+      return demoStateResponse(demoThreadDetail(next.ui, threadId)!, next);
+    }
     const patient = ApovoStore.getActivePatient();
     if (!patient) {
       return NextResponse.json({ error: 'No active patient profile' }, { status: 404 });
@@ -100,11 +130,73 @@ export async function GET(
 }
 
 export async function POST(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
     const { threadId } = await params;
+    if (isVercelDemoMode()) {
+      const auth = requireDemoSession(req);
+      if (auth.error) return auth.error;
+      if (!isDemoThreadId(threadId)) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+      }
+      const body = (await req.json().catch(() => ({}))) as {
+        action?: string;
+        to?: string;
+        subject?: string;
+        text?: string;
+        consent?: boolean;
+      };
+
+      if (body.action === 'create_or_update_draft') {
+        const current = auth.session.ui.draft;
+        const to = (body.to || current?.to || 'grants@rememberbetty.com').trim().slice(0, 160);
+        const subject = (body.subject || current?.subject || 'Synthetic status follow-up')
+          .trim()
+          .slice(0, 200);
+        const text = (body.text || current?.text || '').trim().slice(0, 600);
+        if (!to.includes('@') || !text) {
+          return NextResponse.json(
+            { error: 'A recipient and draft message body are required.' },
+            { status: 400 }
+          );
+        }
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          draft: { threadId, to, subject, text },
+        }));
+        return demoStateResponse({ success: true, draft: demoDraft(next.ui) }, next);
+      }
+
+      if (body.action === 'discard_draft') {
+        const next = updateDemoUiState(auth.session, (ui) => ({ ...ui, draft: undefined }));
+        return demoStateResponse({ success: true, draft: null }, next);
+      }
+
+      if (body.action === 'consent_send_draft' || body.action === 'reply') {
+        if (!body.consent) {
+          return NextResponse.json(
+            { error: 'Explicit user consent is required for this demonstration.' },
+            { status: 400 }
+          );
+        }
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          draft: undefined,
+          sentThreadIds: appendUnique(ui.sentThreadIds, threadId),
+        }));
+        return demoStateResponse(
+          {
+            success: true,
+            sent: { messageId: `demo_sent_${threadId}`, threadId },
+          },
+          next
+        );
+      }
+
+      return NextResponse.json({ error: 'Unsupported inbox action' }, { status: 400 });
+    }
     const patient = ApovoStore.getActivePatient();
     if (!patient) {
       return NextResponse.json({ error: 'No active patient profile' }, { status: 404 });

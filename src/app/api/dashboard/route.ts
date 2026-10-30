@@ -1,33 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { isVercelDemoMode } from '../../../lib/demo-session/config';
+import { demoDashboardPayload, EMPTY_DEMO_UI_STATE } from '../../../lib/demo-session/fixtures';
+import { readDemoSessionOrNull } from '../../../lib/demo-session/state';
 
-function syntheticDemoDashboard() {
-  return NextResponse.json({
-    patient: {
-      id: 'demo_ava_testperson',
-      first_name: 'Ava',
-      last_name: 'Testperson',
-      diagnosis: 'Synthetic breast cancer test fixture',
-      status: 'active',
-      created_at: '2026-01-01T00:00:00.000Z',
-      updated_at: '2026-01-01T00:00:00.000Z',
-    },
-    applications: [],
-    startedGrants: [],
-    events: [],
-    openTasks: [],
-    openTasksCount: 0,
-    pendingItemsCount: 0,
-    unreadEmailsCount: 0,
-    agentRun: null,
-    capabilities: { applicationTestMode: true },
-    stats: { secured: 0, inProgress: 0, followUps: 0, hoursSaved: 0 },
-    syntheticDemo: true,
-  });
-}
-
-export async function GET() {
-  if (isVercelDemoMode()) return syntheticDemoDashboard();
+export async function GET(request: NextRequest) {
+  if (isVercelDemoMode()) {
+    return NextResponse.json(
+      demoDashboardPayload(readDemoSessionOrNull(request)?.ui || EMPTY_DEMO_UI_STATE)
+    );
+  }
   const { ApovoStore } = await import('../../../lib/store');
   const capabilities = {
     applicationTestMode: process.env.APOVO_APPLICATION_TEST_MODE === '1',

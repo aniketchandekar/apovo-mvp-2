@@ -20,6 +20,7 @@ import {
   FlaskConical,
 } from 'lucide-react';
 import { useTestMode } from '@/components/application-test/TestModeContext';
+import { useDemoSession } from '@/components/demo/DemoSessionProvider';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -43,6 +44,7 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const testMode = useTestMode();
+  const demo = useDemoSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -376,32 +378,36 @@ export function AppShell({
                 <strong>{patientDisplayName}</strong>
                 <span><i />Active care profile</span>
               </div>
-              <button
-                type="button"
-                className="sidebar-clear-btn"
-                onClick={handleClearData}
-                disabled={clearingData}
-                title="Clear all stored application and profile data"
-              >
-                <Trash2 size={14} />
-                <span>{clearingData ? 'Clearing…' : 'Clear data'}</span>
-              </button>
+              {!demo.available ? (
+                <button
+                  type="button"
+                  className="sidebar-clear-btn"
+                  onClick={handleClearData}
+                  disabled={clearingData}
+                  title="Clear all stored application and profile data"
+                >
+                  <Trash2 size={14} />
+                  <span>{clearingData ? 'Clearing…' : 'Clear data'}</span>
+                </button>
+              ) : null}
             </div>
           ) : (
             <div className="sidebar-profile-collapsed-box">
               <div className="sidebar-profile-collapsed" title={patientDisplayName}>
                 <span className="profile-status-dot" />
               </div>
-              <button
-                type="button"
-                className="sidebar-clear-btn-collapsed"
-                onClick={handleClearData}
-                disabled={clearingData}
-                title="Clear all stored application and profile data"
-                aria-label="Clear all data"
-              >
-                <Trash2 size={15} />
-              </button>
+              {!demo.available ? (
+                <button
+                  type="button"
+                  className="sidebar-clear-btn-collapsed"
+                  onClick={handleClearData}
+                  disabled={clearingData}
+                  title="Clear all stored application and profile data"
+                  aria-label="Clear all data"
+                >
+                  <Trash2 size={15} />
+                </button>
+              ) : null}
             </div>
           )}
         </div>

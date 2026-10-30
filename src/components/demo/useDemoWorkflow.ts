@@ -42,10 +42,19 @@ export function useDemoWorkflow(runId: string) {
 
     async function connect() {
       let reconnects = 0;
+      let nextStartIndex = 0;
+      const expiresAt = demo.session?.expiresAt
+        ? new Date(demo.session.expiresAt).getTime()
+        : Number.POSITIVE_INFINITY;
       while (!controller.signal.aborted) {
+        if (Date.now() >= expiresAt) {
+          setError('This demo session expired. Start a new session to continue.');
+          setLoading(false);
+          return;
+        }
         try {
           const response = await fetch(
-            `/api/demo/workflows/${encodeURIComponent(runId)}/events?startIndex=0`,
+            `/api/demo/workflows/${encodeURIComponent(runId)}/events?startIndex=${nextStartIndex}`,
             { cache: 'no-store', credentials: 'same-origin', signal: controller.signal }
           );
           if (!response.ok || !response.body) {
@@ -68,6 +77,7 @@ export function useDemoWorkflow(runId: string) {
               if (!line.trim()) continue;
               const parsed: unknown = JSON.parse(line);
               if (!isDemoWorkflowEvent(parsed)) continue;
+              nextStartIndex += 1;
               terminal = terminal || TERMINAL_PHASES.has(parsed.phase);
               setEvents((current) => {
                 const key = eventKey(parsed);
@@ -81,26 +91,26 @@ export function useDemoWorkflow(runId: string) {
 
           if (terminal || controller.signal.aborted) return;
           reconnects += 1;
-          if (reconnects > 3) {
-            setError('Live updates paused. Refresh this page to replay the durable activity.');
-            return;
-          }
         } catch (cause) {
           if (controller.signal.aborted) return;
           reconnects += 1;
           if (reconnects > 3) {
-            setError(cause instanceof Error ? cause.message : 'Workflow activity is unavailable.');
+            setError(
+              cause instanceof Error
+                ? `${cause.message} Retrying…`
+                : 'Workflow activity is temporarily unavailable. Retrying…'
+            );
             setLoading(false);
-            return;
           }
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 800));
+        const delay = Math.min(10_000, 800 * 2 ** Math.min(reconnects, 4));
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
       }
     }
 
     void connect();
     return () => controller.abort();
-  }, [runId]);
+  }, [demo.session?.expiresAt, runId]);
 
   const approve = useCallback(async () => {
     setApproving(true);

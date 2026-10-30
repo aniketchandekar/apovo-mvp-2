@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ApovoStore } from '@/lib/store';
 import {
   AgentMailError,
@@ -6,17 +6,38 @@ import {
   sendCareMessage,
 } from '@/lib/integrations/agentmail/client';
 import { syncPatientCareInbox } from '@/lib/integrations/agentmail/inbox-sync';
+import { isVercelDemoMode } from '@/lib/demo-session/config';
+import {
+  DEMO_ACK_THREAD_ID,
+  EMPTY_DEMO_UI_STATE,
+  demoDraft,
+  demoInboxPayload,
+  isDemoThreadId,
+} from '@/lib/demo-session/fixtures';
+import {
+  appendUnique,
+  demoStateResponse,
+  readDemoSessionOrNull,
+  requireDemoSession,
+  updateDemoUiState,
+  without,
+} from '@/lib/demo-session/state';
 
 function hasAgentMailApiKey(): boolean {
   return Boolean(process.env.AGENTMAIL_API_KEY?.trim());
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get('filter') || 'inbox';
     const query = searchParams.get('q') || '';
     const forceSync = searchParams.get('sync') === '1';
+    if (isVercelDemoMode()) {
+      return NextResponse.json(
+        demoInboxPayload(readDemoSessionOrNull(req)?.ui || EMPTY_DEMO_UI_STATE, filter, query)
+      );
+    }
 
     const patient = ApovoStore.getActivePatient();
     if (!patient) {
@@ -98,7 +119,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = (await req.json().catch(() => ({}))) as {
       action?: string;
@@ -110,6 +131,89 @@ export async function POST(req: Request) {
       subject?: string;
       text?: string;
     };
+
+    if (isVercelDemoMode()) {
+      const auth = requireDemoSession(req);
+      if (auth.error) return auth.error;
+      if (
+        (body.action === 'toggle_star' || body.action === 'set_unread') &&
+        (!body.thread_id || !isDemoThreadId(body.thread_id))
+      ) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
+      }
+
+      if (body.action === 'toggle_star' && body.thread_id) {
+        const wasStarred = auth.session.ui.starredThreadIds.includes(body.thread_id);
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          starredThreadIds: wasStarred
+            ? without(ui.starredThreadIds, body.thread_id!)
+            : appendUnique(ui.starredThreadIds, body.thread_id!),
+        }));
+        return demoStateResponse({ success: true, starred: !wasStarred }, next);
+      }
+
+      if (
+        body.action === 'set_unread' &&
+        body.thread_id &&
+        typeof body.unread === 'boolean'
+      ) {
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          unreadThreadIds: body.unread
+            ? appendUnique(ui.unreadThreadIds, body.thread_id!)
+            : without(ui.unreadThreadIds, body.thread_id!),
+          readThreadIds: body.unread
+            ? without(ui.readThreadIds, body.thread_id!)
+            : appendUnique(ui.readThreadIds, body.thread_id!),
+        }));
+        return demoStateResponse({ success: true, unread: body.unread }, next);
+      }
+
+      if (body.action === 'create_followup_draft') {
+        const to = (body.to || 'grants@rememberbetty.com').trim().slice(0, 160);
+        const subject = (body.subject || 'Synthetic Remember Betty status follow-up')
+          .trim()
+          .slice(0, 200);
+        const text = (body.text || 'This is a synthetic status follow-up demonstration.')
+          .trim()
+          .slice(0, 600);
+        if (!to.includes('@') || !subject || !text) {
+          return NextResponse.json(
+            { error: 'Recipient, subject, and message body are required.' },
+            { status: 400 }
+          );
+        }
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          draft: { threadId: DEMO_ACK_THREAD_ID, to, subject, text },
+        }));
+        return demoStateResponse(
+          { success: true, draft: demoDraft(next.ui), task: null },
+          next
+        );
+      }
+
+      if (body.action === 'send_new') {
+        const next = updateDemoUiState(auth.session, (ui) => ({
+          ...ui,
+          draft: undefined,
+          sentThreadIds: appendUnique(ui.sentThreadIds, DEMO_ACK_THREAD_ID),
+        }));
+        return demoStateResponse(
+          {
+            success: true,
+            email: {
+              message_id: 'demo_message_sent',
+              thread_id: DEMO_ACK_THREAD_ID,
+            },
+          },
+          next
+        );
+      }
+
+      return NextResponse.json({ error: 'Unsupported inbox action' }, { status: 400 });
+    }
 
     const patient = ApovoStore.getActivePatient();
     if (!patient) {

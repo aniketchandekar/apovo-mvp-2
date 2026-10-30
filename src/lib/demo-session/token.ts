@@ -33,6 +33,14 @@ export function createDemoSession(input: {
       packets: 1,
       emails: 1,
     },
+    ui: {
+      answeredTaskIds: [],
+      skippedTaskIds: [],
+      starredThreadIds: [],
+      readThreadIds: [],
+      unreadThreadIds: [],
+      sentThreadIds: [],
+    },
   };
 }
 

@@ -1,21 +1,34 @@
 import 'server-only';
 import Browserbase from '@browserbasehq/sdk';
-import { browserbase, Stagehand } from '@browserbasehq/stagehand';
+import { chromium } from 'playwright-core';
 import { ApplicationRunError } from '../../application-agent/errors';
 import { getBrowserbaseConfiguration } from './config';
 import type { BrowserAutomationSession } from './types';
+
+function diagnostic(error: unknown, phase: string) {
+  const value = error as { name?: unknown; code?: unknown } | null;
+  return {
+    phase,
+    name: typeof value?.name === 'string' ? value.name : 'Error',
+    code:
+      typeof value?.code === 'string' || typeof value?.code === 'number'
+        ? value.code
+        : undefined,
+  };
+}
 
 export async function startBrowserbaseSession(
   runId: string,
   applicationId: string
 ): Promise<BrowserAutomationSession> {
   const configuration = getBrowserbaseConfiguration();
-  let browser: Awaited<ReturnType<typeof browserbase.launch>> | undefined;
-  let stagehand: Stagehand | undefined;
+  const sdk = new Browserbase({ apiKey: configuration.apiKey });
+  let sessionId = '';
+  let playwrightBrowser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | undefined;
+  let phase = 'create_session';
 
   try {
-    browser = await browserbase.launch({
-      apiKey: configuration.apiKey,
+    const session = await sdk.sessions.create({
       projectId: configuration.projectId,
       region: configuration.region,
       api_timeout: 900,
@@ -33,46 +46,58 @@ export async function startBrowserbaseSession(
         program: 'remember-betty',
       },
     });
-
-    if (!browser.sessionId) {
+    sessionId = session.id.trim();
+    if (!sessionId || !session.connectUrl?.trim()) {
       throw new ApplicationRunError(
         'BROWSER_LAUNCH_FAILED',
-        'Browserbase did not return a session identifier.',
+        'Browserbase did not return a usable session.',
         true
       );
     }
 
-    stagehand = await Stagehand.create({
-      browser,
-      logging: { level: 'off', format: 'json' },
-    });
+    phase = 'connect_cdp';
+    playwrightBrowser = await chromium.connectOverCDP(session.connectUrl);
+    const context = playwrightBrowser.contexts()[0];
+    if (!context) throw new Error('Browserbase session did not expose a browser context.');
 
-    const sdk = new Browserbase({ apiKey: configuration.apiKey });
-    const [liveUrls, sessionInfo] = await Promise.all([
-      sdk.sessions.debug(browser.sessionId),
-      sdk.sessions.retrieve(browser.sessionId),
-    ]);
-    const sessionId = browser.sessionId;
-    if (!sessionInfo.connectUrl) {
-      throw new ApplicationRunError(
-        'BROWSER_LAUNCH_FAILED',
-        'Browserbase did not return a connection URL.',
-        true
-      );
-    }
+    phase = 'load_debug_url';
+    const liveUrls = await sdk.sessions.debug(sessionId);
+    let closed = false;
 
     return {
       sessionId,
-      connectUrl: sessionInfo.connectUrl,
+      connectUrl: session.connectUrl,
       liveViewUrl: liveUrls.debuggerFullscreenUrl,
-      browser: browser as unknown as BrowserAutomationSession['browser'],
-      stagehand: stagehand as unknown as BrowserAutomationSession['stagehand'],
+      browser: {
+        context: {
+          async pages() {
+            return context.pages();
+          },
+          async newPage() {
+            return context.newPage();
+          },
+        },
+        async close() {
+          await playwrightBrowser?.close();
+        },
+      },
       async close() {
-        await Promise.allSettled([stagehand?.close(), browser?.close()]);
+        if (closed) return;
+        closed = true;
+        await Promise.allSettled([
+          playwrightBrowser?.close(),
+          sdk.sessions.update(sessionId, { status: 'REQUEST_RELEASE' }),
+        ]);
       },
     };
   } catch (error) {
-    await Promise.allSettled([stagehand?.close(), browser?.close()]);
+    console.error('[Browserbase] Session startup failed', diagnostic(error, phase));
+    await Promise.allSettled([
+      playwrightBrowser?.close(),
+      sessionId
+        ? sdk.sessions.update(sessionId, { status: 'REQUEST_RELEASE' })
+        : Promise.resolve(),
+    ]);
     if (error instanceof ApplicationRunError) throw error;
     throw new ApplicationRunError(
       'BROWSER_LAUNCH_FAILED',

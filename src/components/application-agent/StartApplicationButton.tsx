@@ -11,11 +11,20 @@ export function StartApplicationButton({ applicationId }: { applicationId: strin
   const demo = useDemoSession();
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [modeConflict, setModeConflict] = useState(false);
 
   async function startApplication(restart = false) {
+    if (demo.available && !applicationId.includes('remember-betty')) {
+      setError('');
+      setNotice(
+        'Remember Betty Foundation is the live automated workflow in this protected demo.'
+      );
+      return;
+    }
     setStarting(true);
     setError('');
+    setNotice('');
     setModeConflict(false);
     try {
       const useDurableDemo = demo.available && applicationId.includes('remember-betty');
@@ -70,6 +79,7 @@ export function StartApplicationButton({ applicationId }: { applicationId: strin
             : 'Apply with Apovo'}
       </button>
       {error ? <p role="alert">{error}</p> : null}
+      {notice ? <p className="start-notice" role="status">{notice}</p> : null}
       {modeConflict ? (
         <button
           type="button"
@@ -85,6 +95,7 @@ export function StartApplicationButton({ applicationId }: { applicationId: strin
         button { width: 100%; min-height: 44px; }
         button:disabled { cursor: wait; opacity: 0.65; }
         p { margin: 0; color: #a33a3a; font-size: 0.78rem; line-height: 1.35; }
+        .start-notice { color: #5f5b57; }
         .restart-mode { width: 100%; min-height: 38px; }
       `}</style>
     </div>
