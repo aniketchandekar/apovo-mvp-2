@@ -71,6 +71,7 @@ async function persistPacketStep(
       pageCount: packet.pageCount,
       sha256: packet.sha256,
     });
+    await writer.close();
   } finally {
     writer.releaseLock();
   }

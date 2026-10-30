@@ -68,4 +68,5 @@ test('workflow stores the PDF outside the public activity stream', () => {
   assert.match(workflow, /getWritable<DemoPacketArtifact>\(\{ namespace: DEMO_PACKET_STREAM \}\)/);
   assert.match(workflow, /await persistPacketStep\(writable, packetWritable, packet, input\.deliveryAvailable\)/);
   assert.ok(workflow.indexOf('await writer.write({') < workflow.indexOf('phase: deliveryAvailable'));
+  assert.ok(workflow.indexOf('await writer.write({') < workflow.indexOf('await writer.close()'));
 });
