@@ -53,6 +53,7 @@ test('packet artifact delivery is bound to the signed demo session', () => {
   assert.match(route, /namespace: DEMO_PACKET_STREAM/);
   assert.match(route, /artifact\.artifactId !== artifactId/);
   assert.match(route, /createHash\('sha256'\)/);
+  assert.doesNotMatch(route, /await reader\.cancel/);
   assert.match(route, /Content-Type': 'application\/pdf'/);
   assert.match(route, /X-Frame-Options': 'SAMEORIGIN'/);
   assert.match(route, /export const HEAD = GET/);

@@ -24,7 +24,6 @@ async function readPacketArtifact(runId: string) {
     const { value, done } = await reader.read();
     return done ? null : value;
   } finally {
-    await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }
