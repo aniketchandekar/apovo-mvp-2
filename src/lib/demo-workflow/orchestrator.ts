@@ -1,4 +1,5 @@
 import type { EmitDemoWorkflowEvent } from './types';
+import { demoPacketArtifactId } from './types';
 import type { SyntheticBrowserDiscoveryResult } from './browser-discovery';
 
 interface PacketResult {
@@ -36,7 +37,7 @@ export async function runRememberBettyDemoCore(
     phase: 'awaiting_approval',
     message: 'The synthetic packet is ready. Confirm the single test-email attempt to continue.',
     packet: {
-      base64: packet.packetBase64,
+      artifactId: demoPacketArtifactId(packet.sha256),
       byteLength: packet.byteLength,
       pageCount: packet.pageCount,
       sha256: packet.sha256,

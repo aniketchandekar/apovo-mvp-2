@@ -45,11 +45,30 @@ export function consumeDemoBudget(
   };
 }
 
-export function bindWorkflowRun(session: DemoSession, workflowRunId: string): DemoSession {
+export function bindWorkflowRun(
+  session: DemoSession,
+  workflowRunId: string,
+  workflowAttempt = 1
+): DemoSession {
   if (session.workflowRunId && session.workflowRunId !== workflowRunId) {
     throw new Error('This demo session is already bound to another workflow.');
   }
-  return { ...session, workflowRunId };
+  return { ...session, workflowRunId, workflowAttempt };
+}
+
+export function replaceWorkflowRun(
+  session: DemoSession,
+  expectedRunId: string,
+  workflowRunId: string
+): DemoSession {
+  if (session.workflowRunId !== expectedRunId || session.workflowAttempt >= 2) {
+    throw new Error('This demo session cannot replace its current workflow.');
+  }
+  return {
+    ...session,
+    workflowRunId,
+    workflowAttempt: session.workflowAttempt + 1,
+  };
 }
 
 export function publicDemoSessionSummary(
@@ -63,5 +82,10 @@ export function publicDemoSessionSummary(
     secondsRemaining,
     remaining: { ...session.remaining },
     workflowBound: Boolean(session.workflowRunId),
+    canRestartWorkflow:
+      Boolean(session.workflowRunId) &&
+      session.workflowAttempt < 2 &&
+      session.remaining.workflows > 0 &&
+      session.remaining.packets > 0,
   };
 }

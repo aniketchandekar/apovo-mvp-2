@@ -34,7 +34,8 @@ function validSummary(value: unknown): value is PublicDemoSessionSummary {
     typeof summary.expiresAt === 'string' &&
     typeof summary.secondsRemaining === 'number' &&
     Boolean(summary.remaining) &&
-    typeof summary.remaining?.chatTurns === 'number'
+    typeof summary.remaining?.chatTurns === 'number' &&
+    typeof summary.canRestartWorkflow === 'boolean'
   );
 }
 

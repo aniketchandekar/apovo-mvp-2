@@ -12,8 +12,10 @@ export function useApplicationRun(runId: string) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const cursor = useRef(0);
+  const activeRunId = useRef(runId);
 
   const refresh = useCallback(async () => {
+    const requestedRunId = runId;
     try {
       const [runResponse, eventResponse] = await Promise.all([
         fetch(`/api/application-runs/${encodeURIComponent(runId)}`, { cache: 'no-store' }),
@@ -23,6 +25,7 @@ export function useApplicationRun(runId: string) {
       ]);
       const runPayload = await runResponse.json();
       const eventPayload = await eventResponse.json();
+      if (activeRunId.current !== requestedRunId) return;
       if (!runResponse.ok) throw new Error(runPayload.error || 'This application run is unavailable.');
       if (!eventResponse.ok) throw new Error(eventPayload.error || 'Activity could not be loaded.');
 
@@ -37,16 +40,18 @@ export function useApplicationRun(runId: string) {
       cursor.current = Math.max(cursor.current, eventPayload.lastSequence || 0);
       setError('');
     } catch (cause) {
+      if (activeRunId.current !== requestedRunId) return;
       setError(cause instanceof Error ? cause.message : 'The application workspace is unavailable.');
     } finally {
-      setLoading(false);
+      if (activeRunId.current === requestedRunId) setLoading(false);
     }
   }, [runId]);
 
   useEffect(() => {
+    activeRunId.current = runId;
     cursor.current = 0;
     void refresh();
-  }, [refresh]);
+  }, [refresh, runId]);
 
   useEffect(() => {
     if (run?.state !== 'active') return;

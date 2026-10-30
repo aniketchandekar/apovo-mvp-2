@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { consumeDemoBudget, publicDemoSessionSummary } from '../../src/lib/demo-session/budget';
+import {
+  bindWorkflowRun,
+  consumeDemoBudget,
+  publicDemoSessionSummary,
+  replaceWorkflowRun,
+} from '../../src/lib/demo-session/budget';
 import { createDemoSession } from '../../src/lib/demo-session/token';
 import { demoSessionCookieOptions } from '../../src/lib/demo-session/cookie';
 
@@ -16,12 +21,19 @@ test('consumes each immutable budget and rejects the next action', () => {
   }
   assert.equal(consumeDemoBudget(session, 'chat', now).ok, false);
 
-  for (const action of ['workflow', 'packet', 'email'] as const) {
-    const first = consumeDemoBudget(session, action, now);
-    assert.equal(first.ok, true);
-    if (first.ok) session = first.session;
+  for (const action of ['workflow', 'packet'] as const) {
+    for (let index = 0; index < 2; index += 1) {
+      const result = consumeDemoBudget(session, action, now);
+      assert.equal(result.ok, true);
+      if (result.ok) session = result.session;
+    }
     assert.equal(consumeDemoBudget(session, action, now).ok, false);
   }
+
+  const email = consumeDemoBudget(session, 'email', now);
+  assert.equal(email.ok, true);
+  if (email.ok) session = email.session;
+  assert.equal(consumeDemoBudget(session, 'email', now).ok, false);
 
   for (let index = 0; index < 2; index += 1) {
     const result = consumeDemoBudget(session, 'retry', now);
@@ -29,7 +41,22 @@ test('consumes each immutable budget and rejects the next action', () => {
     if (result.ok) session = result.session;
   }
   assert.equal(consumeDemoBudget(session, 'retry', now).ok, false);
-  assert.equal(session.sequence, 15);
+  assert.equal(session.sequence, 17);
+});
+
+test('replaces a bound workflow once without restoring the email allowance', () => {
+  let session = createDemoSession({ now, sessionId: 'session_test' });
+  session = bindWorkflowRun(session, 'run_first', 1);
+  const email = consumeDemoBudget(session, 'email', now);
+  assert.equal(email.ok, true);
+  if (!email.ok) return;
+
+  const restarted = replaceWorkflowRun(email.session, 'run_first', 'run_second');
+  assert.equal(restarted.workflowRunId, 'run_second');
+  assert.equal(restarted.workflowAttempt, 2);
+  assert.equal(restarted.remaining.emails, 0);
+  assert.equal(publicDemoSessionSummary(restarted, now).canRestartWorkflow, false);
+  assert.throws(() => replaceWorkflowRun(restarted, 'run_second', 'run_third'));
 });
 
 test('rejects actions at expiry and exposes only a safe public summary', () => {

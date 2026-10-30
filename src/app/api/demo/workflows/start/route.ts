@@ -54,11 +54,13 @@ export async function POST(request: NextRequest) {
       {
         sessionId: current.sessionId,
         sessionExpiresAt: new Date(current.expiresAt * 1_000).toISOString(),
+        attempt: 1,
+        deliveryAvailable: current.remaining.emails > 0,
       },
     ], {
       attributes: { demo: 'remember-betty-synthetic' },
     });
-    const next = bindWorkflowRun(packetBudget.session, run.runId);
+    const next = bindWorkflowRun(packetBudget.session, run.runId, 1);
     const response = NextResponse.json(
       {
         runId: run.runId,

@@ -5,20 +5,28 @@ import { inspectRememberBettySite } from '@/lib/application-agent/phases/inspect
 import { deliverSyntheticDemoPacket } from '@/lib/integrations/agentmail/application-test-delivery';
 import { runSyntheticBrowserDiscovery } from '@/lib/demo-workflow/browser-discovery';
 import { buildSyntheticDemoPacket } from '@/lib/demo-workflow/build-packet';
-import type { DemoWorkflowEvent } from '@/lib/demo-workflow/types';
+import {
+  DEMO_PACKET_STREAM,
+  demoPacketArtifactId,
+  type DemoPacketArtifact,
+  type DemoWorkflowEvent,
+} from '@/lib/demo-workflow/types';
 
 export interface RememberBettyDemoInput {
   sessionId: string;
   sessionExpiresAt: string;
+  attempt: 1 | 2;
+  deliveryAvailable: boolean;
 }
 
 export type RememberBettyDemoResult =
   | { status: 'sent'; messageId: string; threadId: string; sentAt: string }
   | { status: 'expired' | 'declined' | 'failed' | 'delivery_uncertain' }
+  | { status: 'preview_only' }
   | { status: 'duplicate'; ownerRunId: string };
 
-export function demoRunGuardToken(sessionId: string) {
-  return `apovo-demo-run:${sessionId}`;
+export function demoRunGuardToken(sessionId: string, attempt: 1 | 2) {
+  return `apovo-demo-run:${sessionId}:${attempt}`;
 }
 
 export function demoApprovalToken(sessionId: string) {
@@ -45,6 +53,41 @@ async function emitDemoEventStep(
   await writeEvent(writable, event);
 }
 emitDemoEventStep.maxRetries = 0;
+
+async function persistPacketStep(
+  writable: WritableStream<DemoWorkflowEvent>,
+  packetWritable: WritableStream<DemoPacketArtifact>,
+  packet: Awaited<ReturnType<typeof buildPacketStep>>,
+  deliveryAvailable: boolean
+) {
+  'use step';
+  const artifactId = demoPacketArtifactId(packet.sha256);
+  const writer = packetWritable.getWriter();
+  try {
+    await writer.write({
+      artifactId,
+      base64: packet.packetBase64,
+      byteLength: packet.byteLength,
+      pageCount: packet.pageCount,
+      sha256: packet.sha256,
+    });
+  } finally {
+    writer.releaseLock();
+  }
+  await writeEvent(writable, {
+    phase: deliveryAvailable ? 'packet_ready' : 'packet_ready_no_delivery',
+    message: deliveryAvailable
+      ? `Assembled a ${packet.pageCount}-page synthetic test packet for review.`
+      : `The restarted ${packet.pageCount}-page synthetic packet is ready. The session email attempt was already used.`,
+    packet: {
+      artifactId,
+      byteLength: packet.byteLength,
+      pageCount: packet.pageCount,
+      sha256: packet.sha256,
+    },
+  });
+}
+persistPacketStep.maxRetries = 0;
 
 async function discoverApplicationStep(
   workflowRunId: string,
@@ -114,8 +157,9 @@ export async function rememberBettyDemoWorkflow(
 
   const { workflowRunId } = getWorkflowMetadata();
   const writable = getWritable<DemoWorkflowEvent>();
+  const packetWritable = getWritable<DemoPacketArtifact>({ namespace: DEMO_PACKET_STREAM });
   const runGuard = createHook({
-    token: demoRunGuardToken(input.sessionId),
+    token: demoRunGuardToken(input.sessionId, input.attempt),
     experimental_minRetention: '15m',
   });
   const conflict = await runGuard.getConflict();
@@ -131,12 +175,17 @@ export async function rememberBettyDemoWorkflow(
   try {
     const source = await discoverApplicationStep(workflowRunId, writable);
     packet = await buildPacketStep(source.bytesBase64, writable);
+    await persistPacketStep(writable, packetWritable, packet, input.deliveryAvailable);
   } catch {
     await emitDemoEventStep(writable, {
       phase: 'failed',
       message: 'The synthetic application could not be prepared. No email was sent.',
     });
     return { status: 'failed' };
+  }
+
+  if (!input.deliveryAvailable) {
+    return { status: 'preview_only' };
   }
 
   if (Date.now() >= new Date(input.sessionExpiresAt).getTime()) {

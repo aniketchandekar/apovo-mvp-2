@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { TestModeProvider } from '@/components/application-test/TestModeContext';
 import { DemoSessionProvider } from '@/components/demo/DemoSessionProvider';
-import { DemoSessionBanner } from '@/components/demo/DemoSessionBanner';
 
 export const metadata: Metadata = {
   title: 'Apovo | Care Concierge for Breast Cancer Support',
@@ -26,7 +25,6 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <DemoSessionProvider>
           <TestModeProvider>
-            <DemoSessionBanner />
             <main className="apovo-app-root">
               {children}
             </main>

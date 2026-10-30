@@ -6,6 +6,7 @@ import type { PublicDemoSessionSummary } from '@/lib/demo-session/types';
 import { useDemoSession } from './DemoSessionProvider';
 
 const TERMINAL_PHASES = new Set<DemoWorkflowPhase>([
+  'packet_ready_no_delivery',
   'email_sent',
   'delivery_uncertain',
   'failed',
@@ -17,8 +18,9 @@ function isDemoWorkflowEvent(value: unknown): value is DemoWorkflowEvent {
   return typeof event.phase === 'string' && typeof event.message === 'string';
 }
 
-function eventKey(event: DemoWorkflowEvent) {
-  return `${event.phase}:${event.packet?.sha256 || ''}:${event.message}`;
+interface IndexedDemoWorkflowEvent {
+  index: number;
+  event: DemoWorkflowEvent;
 }
 
 async function errorMessage(response: Response, fallback: string) {
@@ -32,7 +34,7 @@ async function errorMessage(response: Response, fallback: string) {
 
 export function useDemoWorkflow(runId: string) {
   const demo = useDemoSession();
-  const [events, setEvents] = useState<DemoWorkflowEvent[]>([]);
+  const [indexedEvents, setIndexedEvents] = useState<IndexedDemoWorkflowEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [approving, setApproving] = useState(false);
@@ -77,13 +79,14 @@ export function useDemoWorkflow(runId: string) {
               if (!line.trim()) continue;
               const parsed: unknown = JSON.parse(line);
               if (!isDemoWorkflowEvent(parsed)) continue;
+              const index = nextStartIndex;
               nextStartIndex += 1;
               terminal = terminal || TERMINAL_PHASES.has(parsed.phase);
-              setEvents((current) => {
-                const key = eventKey(parsed);
-                return current.some((event) => eventKey(event) === key)
+              if (controller.signal.aborted) return;
+              setIndexedEvents((current) => {
+                return current.some((item) => item.index === index)
                   ? current
-                  : [...current, parsed];
+                  : [...current, { index, event: parsed }];
               });
             }
             if (done) break;
@@ -136,6 +139,7 @@ export function useDemoWorkflow(runId: string) {
     }
   }, [demo, runId]);
 
+  const events = useMemo(() => indexedEvents.map((item) => item.event), [indexedEvents]);
   const phase = events.at(-1)?.phase;
   const packet = useMemo(
     () => [...events].reverse().find((event) => Boolean(event.packet))?.packet,
@@ -148,6 +152,7 @@ export function useDemoWorkflow(runId: string) {
 
   return {
     events,
+    indexedEvents,
     loading,
     error,
     approving,

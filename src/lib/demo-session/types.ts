@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const demoBudgetSchema = z.object({
   chatTurns: z.number().int().min(0).max(10),
-  workflows: z.number().int().min(0).max(1),
+  workflows: z.number().int().min(0).max(2),
   retries: z.number().int().min(0).max(2),
-  packets: z.number().int().min(0).max(1),
+  packets: z.number().int().min(0).max(2),
   emails: z.number().int().min(0).max(1),
 });
 
@@ -26,13 +26,14 @@ export const demoUiStateSchema = z.object({
 });
 
 export const demoSessionSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   sessionId: z.string().min(8).max(128),
   issuedAt: z.number().int().positive(),
   expiresAt: z.number().int().positive(),
   sequence: z.number().int().min(0),
   remaining: demoBudgetSchema,
   ui: demoUiStateSchema,
+  workflowAttempt: z.number().int().min(0).max(2),
   workflowRunId: z.string().min(8).max(256).optional(),
 });
 
@@ -47,4 +48,5 @@ export interface PublicDemoSessionSummary {
   secondsRemaining: number;
   remaining: DemoBudget;
   workflowBound: boolean;
+  canRestartWorkflow: boolean;
 }

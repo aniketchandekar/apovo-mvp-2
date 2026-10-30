@@ -17,13 +17,18 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const scriptSource = [
+      "'self'",
+      "'unsafe-inline'",
+      ...(process.env.NODE_ENV === 'development' ? ["'unsafe-eval'"] : []),
+    ].join(' ');
     const contentSecurityPolicy = [
       "default-src 'self'",
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src ${scriptSource}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",
@@ -31,6 +36,10 @@ const nextConfig: NextConfig = {
       "frame-src 'self' https://*.browserbase.com",
       "upgrade-insecure-requests",
     ].join('; ');
+    const pdfPreviewHeaders = [
+      { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+    ];
     return [
       {
         source: '/:path*',
@@ -45,6 +54,14 @@ const nextConfig: NextConfig = {
           },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
         ],
+      },
+      {
+        source: '/api/demo/workflows/:runId/artifacts/:artifactId',
+        headers: pdfPreviewHeaders,
+      },
+      {
+        source: '/api/application-runs/:runId/artifacts/:artifactId',
+        headers: pdfPreviewHeaders,
       },
     ];
   },

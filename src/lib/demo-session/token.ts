@@ -21,16 +21,16 @@ export function createDemoSession(input: {
 } = {}): DemoSession {
   const issuedAt = Math.floor((input.now ?? Date.now()) / 1_000);
   return {
-    version: 1,
+    version: 2,
     sessionId: input.sessionId || `demo_${randomUUID()}`,
     issuedAt,
     expiresAt: issuedAt + DEMO_SESSION_DURATION_SECONDS,
     sequence: 0,
     remaining: {
       chatTurns: 10,
-      workflows: 1,
+      workflows: 2,
       retries: 2,
-      packets: 1,
+      packets: 2,
       emails: 1,
     },
     ui: {
@@ -41,6 +41,7 @@ export function createDemoSession(input: {
       unreadThreadIds: [],
       sentThreadIds: [],
     },
+    workflowAttempt: 0,
   };
 }
 

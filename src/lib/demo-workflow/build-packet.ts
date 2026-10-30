@@ -52,15 +52,5 @@ export async function buildSyntheticDemoPacket(input: {
     pageCount: assembled.pageCount,
     sha256: createHash('sha256').update(assembled.bytes).digest('hex'),
   };
-  await input.emit({
-    phase: 'packet_ready',
-    message: `Assembled a ${assembled.pageCount}-page synthetic test packet for review.`,
-    packet: {
-      base64: result.packetBase64,
-      byteLength: result.byteLength,
-      pageCount: result.pageCount,
-      sha256: result.sha256,
-    },
-  });
   return result;
 }

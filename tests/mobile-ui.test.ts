@@ -13,6 +13,11 @@ test('mobile viewport permits user zoom and uses the Next viewport API', () => {
   assert.doesNotMatch(layout, /maximum-scale|maximumScale|userScalable/);
 });
 
+test('deployed demo does not render the floating synthetic-session banner', () => {
+  const layout = source('src/app/layout.tsx');
+  assert.doesNotMatch(layout, /DemoSessionBanner|Synthetic live demo/);
+});
+
 test('shared shell exposes five safe-area-aware mobile destinations', () => {
   const shell = source('src/components/dashboard/AppShell.tsx');
   assert.match(shell, /aria-label="Primary navigation"/);
@@ -45,12 +50,33 @@ test('mobile form controls retain a 16px text size', () => {
   assert.match(styles, /@media \(max-width: 860px\)[\s\S]*font-size: 16px !important/);
 });
 
-test('durable demo packet preview is mobile-safe and revokes private blob URLs', () => {
+test('durable demo packet preview uses browser tabs and a mobile activity drawer', () => {
   const preview = source('src/components/demo/DemoPacketPreview.tsx');
   const workspace = source('src/components/demo/DemoWorkflowWorkspace.tsx');
-  assert.match(preview, /URL\.revokeObjectURL/);
-  assert.match(preview, /min-height: 48px/);
-  assert.match(preview, /recipient is fixed on the server/i);
-  assert.match(workspace, /grid-template-columns: 1fr/);
+  const viewer = source('src/components/demo/DemoWorkspaceViewer.tsx');
+  assert.doesNotMatch(preview, /createObjectURL|packet\.base64/);
+  assert.match(preview, /api\/demo\/workflows/);
+  assert.match(preview, /method: 'HEAD'/);
+  assert.match(preview, /Retry preview/);
+  assert.match(viewer, /role="tablist"/);
+  assert.match(viewer, /packet \? 'pdf' : 'browser'/);
+  assert.match(workspace, /key=\{workflow\.packet\?\.artifactId \|\| 'browser'\}/);
+  assert.match(workspace, /Activity &amp; actions/);
+  assert.match(workspace, /data-open=\{activityOpen\}/);
+  assert.match(workspace, /env\(safe-area-inset-bottom\)/);
+  assert.match(workspace, /recipient is fixed on the server/i);
   assert.match(workspace, /Synthetic AI workflow/);
+});
+
+test('legacy application workspace keeps live browser and filled PDF in separate tabs', () => {
+  const workspace = source('src/components/application-agent/ApplicationWorkspace.tsx');
+  const viewer = source('src/components/application-agent/ApplicationWorkspaceViewer.tsx');
+  const run = source('src/components/application-agent/useApplicationRun.ts');
+  assert.match(workspace, /key={`legacy-\$\{runId\}`}/);
+  assert.match(viewer, /role="tablist"/);
+  assert.match(viewer, /Live browser/);
+  assert.match(viewer, /Filled PDF/);
+  assert.match(viewer, /pdfAvailable && !sawPdf\.current/);
+  assert.match(run, /cursor\.current = 0/);
+  assert.match(run, /activeRunId\.current !== requestedRunId/);
 });

@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ArrowLeft, RotateCcw, RotateCw, Square } from 'lucide-react';
 import { ActivityRail } from './ActivityRail';
-import { LiveBrowserPanel } from './LiveBrowserPanel';
-import { PdfPacketPreview } from './PdfPacketPreview';
+import { ApplicationWorkspaceViewer } from './ApplicationWorkspaceViewer';
 import { useApplicationRun } from './useApplicationRun';
 import { DemoWorkflowWorkspace } from '@/components/demo/DemoWorkflowWorkspace';
 
@@ -22,7 +21,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function ApplicationWorkspace({ runId, demo = false }: { runId: string; demo?: boolean }) {
-  return demo ? <DemoWorkflowWorkspace runId={runId} /> : <LegacyApplicationWorkspace runId={runId} />;
+  return demo
+    ? <DemoWorkflowWorkspace key={`demo-${runId}`} runId={runId} />
+    : <LegacyApplicationWorkspace key={`legacy-${runId}`} runId={runId} />;
 }
 
 function LegacyApplicationWorkspace({ runId }: { runId: string }) {
@@ -110,13 +111,7 @@ function LegacyApplicationWorkspace({ runId }: { runId: string }) {
           runId={run.id}
           onCompleted={refresh}
         />
-        {run.state === 'active' && run.live_view_url ? (
-          <LiveBrowserPanel run={run} />
-        ) : run.unsigned_packet_artifact_id || run.draft_pdf_artifact_id || run.source_pdf_artifact_id ? (
-          <PdfPacketPreview run={run} />
-        ) : (
-          <LiveBrowserPanel run={run} />
-        )}
+        <ApplicationWorkspaceViewer run={run} />
       </div>
       <style jsx>{`
         .application-workspace { height: 100dvh; min-height: 680px; display: grid; grid-template-rows: 72px auto minmax(0,1fr); overflow: hidden; background: #fff; color: #20201f; }

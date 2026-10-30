@@ -18,11 +18,13 @@ test('creates and verifies a versioned 15-minute demo session', () => {
   assert.equal(session.expiresAt - session.issuedAt, 15 * 60);
   assert.deepEqual(session.remaining, {
     chatTurns: 10,
-    workflows: 1,
+    workflows: 2,
     retries: 2,
-    packets: 1,
+    packets: 2,
     emails: 1,
   });
+  assert.equal(session.version, 2);
+  assert.equal(session.workflowAttempt, 0);
 });
 
 test('rejects altered signatures, malformed tokens, and expiry', () => {
@@ -37,7 +39,7 @@ test('rejects altered signatures, malformed tokens, and expiry', () => {
 
 test('rejects an unsupported version even with a valid signature', () => {
   const session = createDemoSession({ now, sessionId: 'session_test' });
-  const unsupported = { ...session, version: 2 as 1 };
+  const unsupported = { ...session, version: 1 as 2 };
   const token = signDemoSession(unsupported, secret);
   assert.throws(() => verifyDemoSession(token, secret, now));
 });

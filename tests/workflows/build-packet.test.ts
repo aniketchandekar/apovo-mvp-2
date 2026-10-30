@@ -21,7 +21,7 @@ test('builds a bounded in-memory packet using only the synthetic fixture', async
   assert.ok(result.byteLength <= 5 * 1024 * 1024);
   assert.match(result.sha256, /^[a-f0-9]{64}$/);
   assert.ok(result.pageCount >= 3);
-  assert.deepEqual(events, ['filling_form', 'generating_documents', 'packet_ready']);
+  assert.deepEqual(events, ['filling_form', 'generating_documents']);
 
   const packet = Uint8Array.from(Buffer.from(result.packetBase64, 'base64'));
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');

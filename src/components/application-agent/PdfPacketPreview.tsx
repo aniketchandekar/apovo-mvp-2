@@ -4,13 +4,14 @@ import type { ApplicationRun } from '@/lib/application-agent/types';
 export function PdfPacketPreview({ run }: { run: ApplicationRun }) {
   const artifactId =
     run.test_packet_artifact_id ||
+    run.final_packet_artifact_id ||
     run.unsigned_packet_artifact_id ||
     run.draft_pdf_artifact_id ||
     run.source_pdf_artifact_id;
   if (!artifactId) return null;
   const url = `/api/application-runs/${encodeURIComponent(run.id)}/artifacts/${encodeURIComponent(artifactId)}`;
   const isTestPacket = Boolean(run.test_packet_artifact_id);
-  const isPacket = isTestPacket || Boolean(run.unsigned_packet_artifact_id);
+  const isPacket = isTestPacket || Boolean(run.final_packet_artifact_id || run.unsigned_packet_artifact_id);
   const isDraft = !isPacket && Boolean(run.draft_pdf_artifact_id);
   const title = isTestPacket
     ? 'Synthetic test packet'

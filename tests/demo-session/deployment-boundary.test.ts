@@ -55,7 +55,13 @@ test('does not change local API behavior when demo mode is disabled', () => {
 test('configures baseline security headers and Browserbase frame policy', () => {
   const source = fs.readFileSync(path.resolve(__dirname, '../../../next.config.ts'), 'utf8');
   assert.match(source, /Content-Security-Policy/);
+  assert.match(source, /process\.env\.NODE_ENV === 'development'/);
+  assert.match(source, /\["'unsafe-eval'"\]/);
   assert.match(source, /frame-ancestors 'none'/);
+  assert.match(source, /frame-ancestors 'self'/);
+  assert.match(source, /api\/demo\/workflows\/:runId\/artifacts\/:artifactId/);
+  assert.match(source, /api\/application-runs\/:runId\/artifacts\/:artifactId/);
+  assert.match(source, /value: 'SAMEORIGIN'/);
   assert.match(source, /frame-src 'self' https:\/\/\*\.browserbase\.com/);
   assert.match(source, /X-Content-Type-Options/);
   assert.match(source, /Referrer-Policy/);

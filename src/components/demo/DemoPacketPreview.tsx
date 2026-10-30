@@ -1,94 +1,95 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Download, FileText, Mail } from 'lucide-react';
+import { Download, ExternalLink, FileText, RotateCw } from 'lucide-react';
 import type { DemoWorkflowEvent } from '@/lib/demo-workflow/types';
 
 type Packet = NonNullable<DemoWorkflowEvent['packet']>;
 
-function packetBlob(packet: Packet) {
-  const decoded = window.atob(packet.base64);
-  const bytes = new Uint8Array(decoded.length);
-  for (let index = 0; index < decoded.length; index += 1) {
-    bytes[index] = decoded.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: 'application/pdf' });
-}
-
-export function DemoPacketPreview({
-  packet,
-  awaitingApproval,
-  approving,
-  emailSpent,
-  onApprove,
-}: {
-  packet: Packet;
-  awaitingApproval: boolean;
-  approving: boolean;
-  emailSpent: boolean;
-  onApprove: () => Promise<void>;
-}) {
-  const [url, setUrl] = useState('');
+export function DemoPacketPreview({ runId, packet }: { runId: string; packet: Packet }) {
+  const [previewState, setPreviewState] = useState<'checking' | 'loading' | 'ready' | 'error'>('checking');
+  const [attempt, setAttempt] = useState(0);
+  const url = `/api/demo/workflows/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(packet.artifactId)}`;
 
   useEffect(() => {
-    let objectUrl = '';
-    const timeout = window.setTimeout(() => {
-      objectUrl = URL.createObjectURL(packetBlob(packet));
-      setUrl(objectUrl);
-    }, 0);
-    return () => {
-      window.clearTimeout(timeout);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [packet]);
+    const controller = new AbortController();
+    async function checkPreview() {
+      try {
+        const response = await fetch(url, {
+          method: 'HEAD',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          signal: controller.signal,
+        });
+        if (!response.ok || response.headers.get('content-type') !== 'application/pdf') {
+          throw new Error('PDF preview unavailable');
+        }
+        setPreviewState('loading');
+      } catch {
+        if (!controller.signal.aborted) setPreviewState('error');
+      }
+    }
+    void checkPreview();
+    return () => controller.abort();
+  }, [attempt, url]);
 
   return (
     <section className="demo-packet" aria-labelledby="demo-packet-heading">
       <div className="packet-toolbar">
-        <div><FileText size={16} /><strong id="demo-packet-heading">Synthetic packet</strong></div>
-        {url ? <a href={url} download="apovo-remember-betty-synthetic-demo.pdf"><Download size={15} /> Download</a> : null}
-      </div>
-      {url ? <iframe src={url} title="Synthetic Remember Betty application packet" /> : <div className="packet-loading">Preparing preview…</div>}
-      <aside className="send-confirmation" aria-label="Test email confirmation">
-        <div className="confirmation-copy">
-          <span><Mail size={16} /> One test email</span>
-          <strong>Send this fake-data packet to Nicole?</strong>
-          <p>Nothing is submitted to Remember Betty. The recipient is fixed on the server and cannot be edited.</p>
+        <div>
+          <FileText size={15} />
+          <strong id="demo-packet-heading">Filled PDF</strong>
+          <span>{packet.pageCount} pages</span>
         </div>
-        {awaitingApproval ? (
-          <button
-            type="button"
-            onClick={() => void onApprove()}
-            disabled={approving || emailSpent}
-          >
-            <CheckCircle2 size={17} /> {approving ? 'Confirming…' : 'Confirm and send test email'}
-          </button>
-        ) : (
-          <span className="confirmation-state">{emailSpent ? 'Email attempt used' : 'Waiting for the workflow…'}</span>
-        )}
-      </aside>
-      <p className="packet-meta">{packet.pageCount} pages · {(packet.byteLength / 1024).toFixed(0)} KB · visibly marked synthetic</p>
+        <nav aria-label="PDF actions">
+          <a href={url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Open</a>
+          <a href={url} download="apovo-remember-betty-synthetic-demo.pdf"><Download size={14} /> Download</a>
+        </nav>
+      </div>
+      <div className="packet-viewport" data-loaded={previewState === 'ready'}>
+        {previewState === 'error' ? (
+          <div className="packet-error" role="alert">
+            <strong>The filled PDF could not be displayed.</strong>
+            <span>Your workflow is still safe. Check your connection and try the preview again.</span>
+            <button type="button" onClick={() => { setPreviewState('checking'); setAttempt((current) => current + 1); }}><RotateCw size={14} /> Retry preview</button>
+          </div>
+        ) : null}
+        {previewState === 'checking' || previewState === 'loading' ? <div className="packet-loading">Preparing secure PDF preview…</div> : null}
+        {previewState === 'loading' || previewState === 'ready' ? (
+          <iframe
+            key={`${packet.artifactId}-${attempt}`}
+            src={url}
+            title="Filled synthetic Remember Betty application packet"
+            onLoad={() => setPreviewState('ready')}
+          />
+        ) : null}
+      </div>
+      <p className="packet-meta">
+        {(packet.byteLength / 1024).toFixed(0)} KB · visibly marked synthetic · protected test artifact
+      </p>
       <style jsx>{`
-        .demo-packet { min-width: 0; height: 100%; padding: 16px; display: grid; grid-template-rows: 44px minmax(360px, 1fr) auto auto; background: #eeece9; }
-        .packet-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
-        .packet-toolbar div, .packet-toolbar a, .confirmation-copy > span { display: inline-flex; align-items: center; gap: 7px; }
-        .packet-toolbar strong { font-size: .82rem; }
-        .packet-toolbar a { min-height: 36px; padding: 0 11px; border: 1px solid #d8d4cf; border-radius: 7px; background: #fff; color: #3d3b39; font-size: .73rem; text-decoration: none; }
-        iframe, .packet-loading { width: 100%; height: 100%; min-height: 360px; border: 1px solid #d8d4cf; border-radius: 8px; background: #fff; }
-        .packet-loading { display: grid; place-items: center; color: #6f6b67; font-size: .8rem; }
-        .send-confirmation { margin-top: 12px; padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; border: 1px solid #e2c5ba; border-radius: 10px; background: #fff8f4; }
-        .confirmation-copy { min-width: 0; display: grid; gap: 3px; }
-        .confirmation-copy > span { color: #8b3524; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
-        .confirmation-copy strong { font-size: .88rem; }
-        .confirmation-copy p, .packet-meta { margin: 0; color: #6f6b67; font-size: .72rem; line-height: 1.45; }
-        button { min-height: 44px; padding: 0 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 8px; background: #8b3524; color: #fff; font: inherit; font-size: .76rem; font-weight: 650; cursor: pointer; white-space: nowrap; }
-        button:disabled { opacity: .55; cursor: wait; }
-        .confirmation-state { color: #6f6b67; font-size: .74rem; white-space: nowrap; }
-        .packet-meta { padding: 8px 4px 0; }
+        .demo-packet { min-width: 0; height: 100%; padding: 12px; display: grid; grid-template-rows: 42px minmax(0, 1fr) auto; background: #eeece9; }
+        .packet-toolbar { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 4px; }
+        .packet-toolbar > div, nav, a { display: inline-flex; align-items: center; gap: 7px; }
+        .packet-toolbar strong { font-size: .8rem; }
+        .packet-toolbar span { color: #77716c; font-size: .68rem; }
+        nav { gap: 6px; }
+        a { min-height: 34px; padding: 0 10px; border: 1px solid #d8d4cf; border-radius: 7px; background: #fff; color: #3d3b39; font-size: .71rem; text-decoration: none; }
+        .packet-viewport { position: relative; min-height: 0; overflow: hidden; border: 1px solid #d8d4cf; border-radius: 7px; background: #fff; }
+        iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 0; }
+        .packet-viewport[data-loaded='true'] iframe { opacity: 1; }
+        .packet-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #6f6b67; font-size: .8rem; }
+        .packet-error { position: absolute; inset: 0; padding: 28px; display: grid; place-content: center; justify-items: center; gap: 7px; text-align: center; }
+        .packet-error strong { font-size: .9rem; }
+        .packet-error span { max-width: 380px; color: #6f6b67; font-size: .76rem; line-height: 1.5; }
+        .packet-error button { min-height: 40px; margin-top: 5px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #d8d4cf; border-radius: 7px; background: #fff; color: #3d3b39; font: inherit; font-size: .72rem; cursor: pointer; }
+        .packet-meta { margin: 8px 4px 0; color: #6f6b67; font-size: .7rem; line-height: 1.4; }
         @media (max-width: 720px) {
-          .demo-packet { height: auto; padding: 12px; grid-template-rows: 44px minmax(420px, 62dvh) auto auto; }
-          .send-confirmation { grid-template-columns: 1fr; gap: 12px; }
-          button { width: 100%; min-height: 48px; white-space: normal; }
+          .demo-packet { padding: 8px; grid-template-rows: 44px minmax(0, 1fr) auto; }
+          .packet-toolbar span { display: none; }
+          a { min-width: 44px; min-height: 44px; justify-content: center; padding: 0 9px; }
+          a:first-child { display: none; }
+          .packet-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         }
       `}</style>
     </section>
